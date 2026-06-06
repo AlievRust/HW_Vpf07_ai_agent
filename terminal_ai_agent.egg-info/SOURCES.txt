@@ -1,0 +1,13 @@
+README.md
+pyproject.toml
+agent/__init__.py
+agent/agent.py
+agent/run.py
+agent/tools.py
+terminal_ai_agent.egg-info/PKG-INFO
+terminal_ai_agent.egg-info/SOURCES.txt
+terminal_ai_agent.egg-info/dependency_links.txt
+terminal_ai_agent.egg-info/requires.txt
+terminal_ai_agent.egg-info/top_level.txt
+tests/test_memory.py
+tests/test_tools.py

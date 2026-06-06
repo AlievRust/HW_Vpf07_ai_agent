@@ -1,0 +1,9 @@
+openai
+langchain
+langchain-openai
+duckduckgo-search
+requests
+python-dotenv
+
+[dev]
+pytest
