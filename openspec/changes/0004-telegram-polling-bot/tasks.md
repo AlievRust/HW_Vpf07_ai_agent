@@ -1,0 +1,7 @@
+- [x] Обновить OpenSpec для Telegram polling-бота
+- [x] Добавить Telegram entrypoint и общие helper-функции форматирования
+- [x] Подключить Telegram к существующему агентному core
+- [x] Добавить зависимость `python-telegram-bot`
+- [x] Обновить README и project spec
+- [x] Добавить/обновить тесты
+- [x] Прогнать проверки и устранить регрессии

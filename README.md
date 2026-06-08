@@ -1,6 +1,7 @@
 # Терминальный AI-агент
 
 CLI-агент для работы через OpenAI-совместимый интерфейс. Агент понимает задачи на естественном языке, выбирает инструменты и сохраняет краткую память диалога в `agent/memory.json`.
+Также доступен Telegram-бот на polling-режиме с тем же ядром.
 
 ## Возможности
 - веб-поиск через DuckDuckGo;
@@ -25,6 +26,7 @@ OPENAI_MODEL=gpt-5.4-nano
 WORKSPACE_ROOT=/home/xrust/ai_agent_007
 SHOW_MEMORY_SUMMARY=true
 SHORT_TERM_MEMORY_LIMIT=10
+TELEGRAM_BOT_TOKEN=...
 ```
 
 ## Быстрый старт в venv
@@ -52,6 +54,12 @@ python -m agent.run
 python -m agent.run "Какая погода в Екатеринбурге?"
 ```
 
+Telegram-бот запускается отдельно:
+
+```bash
+python -m agent.telegram_bot
+```
+
 Если видишь ошибку `No module named 'agent'`, значит пакет не установлен в текущее окружение. Повтори:
 
 ```bash
@@ -72,6 +80,11 @@ python -m pip install -e .
 - Для курсов обычных валют используй инструмент `get_currency_rates`.
 - По умолчанию он работает с базой и списком из `USD`, `EUR`, `RUB`.
 - Для криптовалют используй `get_crypto_price`, для обычных валют - `get_currency_rates`.
+
+## Telegram
+- Бот работает в polling-режиме.
+- CLI и Telegram используют одно и то же ядро агента.
+- Контекст не разделяется по Telegram user id.
 
 ## Проверка
 ```bash
