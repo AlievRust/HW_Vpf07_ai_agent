@@ -31,12 +31,14 @@ def run_interactive(agent: TerminalAgent) -> None:
             break
 
         try:
-            response = agent.answer(user_input)
+            turn = agent.respond(user_input)
         except Exception as exc:  # noqa: BLE001
             print(f"Ошибка: {exc}")
             continue
 
-        print(response)
+        print(turn.answer)
+        if agent.show_memory_summary and turn.memory_summary:
+            print(f"\nРезюме для памяти: {turn.memory_summary}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -49,10 +51,13 @@ def main(argv: list[str] | None = None) -> int:
         if not prompt:
             parser.error("Пустой запрос")
         try:
-            print(agent.answer(prompt))
+            turn = agent.respond(prompt)
         except Exception as exc:  # noqa: BLE001
             print(f"Ошибка: {exc}", file=sys.stderr)
             return 1
+        print(turn.answer)
+        if agent.show_memory_summary and turn.memory_summary:
+            print(f"\nРезюме для памяти: {turn.memory_summary}")
         return 0
 
     run_interactive(agent)

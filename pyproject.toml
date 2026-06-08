@@ -11,7 +11,7 @@ dependencies = [
   "openai",
   "langchain",
   "langchain-openai",
-  "duckduckgo-search",
+  "ddgs",
   "requests",
   "python-dotenv",
 ]

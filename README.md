@@ -11,6 +11,8 @@ CLI-агент для работы через OpenAI-совместимый ин
 - цена криптовалюты через CoinGecko;
 - долговременная память диалога.
 
+Для веб-поиска используется библиотека `ddgs` вместо устаревшего `duckduckgo-search`.
+
 ## Настройка
 Создай `agent/.env` и заполни:
 
@@ -19,6 +21,8 @@ OPENAI_API_KEY=...
 OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=gpt-5.4-nano
 WORKSPACE_ROOT=/home/xrust/ai_agent_007
+SHOW_MEMORY_SUMMARY=true
+SHORT_TERM_MEMORY_LIMIT=10
 ```
 
 ## Быстрый старт в venv
@@ -51,6 +55,11 @@ python -m agent.run "Какая погода в Екатеринбурге?"
 ```bash
 python -m pip install -e .
 ```
+
+## Память
+- `memory.json` хранит только краткое резюме и список использованных инструментов.
+- `SHOW_MEMORY_SUMMARY=true|false` управляет тем, показывать ли резюме после ответа.
+- `SHORT_TERM_MEMORY_LIMIT` задаёт число последних вопросов пользователя, которые агент учитывает в текущей сессии. По умолчанию это `10`.
 
 ## Проверка
 ```bash

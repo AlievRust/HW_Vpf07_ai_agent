@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import requests
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 from langchain_core.tools import StructuredTool
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
