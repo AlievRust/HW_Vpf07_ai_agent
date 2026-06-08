@@ -36,6 +36,10 @@ def run_interactive(agent: TerminalAgent) -> None:
             print(f"Ошибка: {exc}")
             continue
 
+        if turn.notifications:
+            print("Напоминания:")
+            for notification in turn.notifications:
+                print(f"- {notification}")
         print(turn.answer)
         if agent.show_memory_summary and turn.memory_summary:
             print(f"\nРезюме для памяти: {turn.memory_summary}")
@@ -55,6 +59,10 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as exc:  # noqa: BLE001
             print(f"Ошибка: {exc}", file=sys.stderr)
             return 1
+        if turn.notifications:
+            print("Напоминания:")
+            for notification in turn.notifications:
+                print(f"- {notification}")
         print(turn.answer)
         if agent.show_memory_summary and turn.memory_summary:
             print(f"\nРезюме для памяти: {turn.memory_summary}")

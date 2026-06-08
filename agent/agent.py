@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
 
+from .reminders import ReminderStore, default_reminders_path, format_due_reminder
 from .tools import build_tools, workspace_root
 
 SYSTEM_PROMPT = """Ты — терминальный AI-агент. Отвечай только на русском языке.
@@ -27,6 +28,8 @@ SYSTEM_PROMPT = """Ты — терминальный AI-агент. Отвеча
 - если нужен интернет-поиск по общей информации, используй `web_search`;
 - если нужна погода, используй `get_weather`;
 - если нужна цена криптовалюты, используй `get_crypto_price`;
+- если нужен курс обычных валют, используй `get_currency_rates`;
+- если нужно создать, показать или отменить напоминание, используй `create_reminder`, `list_reminders` и `cancel_reminder`;
 - если нужно прочитать или записать данные, используй файловые инструменты;
 - если нужно выполнить действие в терминале, используй только `run_terminal_command`;
 - если нужен доступ к внешнему HTTP API, используй `http_request`.
@@ -260,6 +263,7 @@ class TurnResult:
     answer: str
     memory_summary: str
     tools_used: list[str]
+    notifications: list[str]
 
 
 class TerminalAgent:
@@ -272,12 +276,14 @@ class TerminalAgent:
         self.workspace_root = workspace_root(workspace_root_path)
         self.memory = MemoryStore.from_path(memory_path or (self.project_root / "agent" / "memory.json"))
         self.memory.compact()
+        self.reminders = ReminderStore.from_path(default_reminders_path())
+        self.reminders.compact()
 
         load_dotenv(_default_env_path(), override=False)
 
         api_key = os.getenv("OPENAI_API_KEY", "").strip()
         base_url = os.getenv("OPENAI_BASE_URL", "").strip() or "https://api.openai.com/v1"
-        model = os.getenv("OPENAI_MODEL", "").strip() or "gpt-5.4"
+        model = os.getenv("OPENAI_MODEL", "").strip() or "gpt-5.4-nano"
 
         if not api_key:
             raise ValueError(
@@ -339,12 +345,19 @@ class TerminalAgent:
                 f"Агент ответил и использовал инструменты: {tools_text}."
             )
 
-        return TurnResult(answer=answer.strip(), memory_summary=memory_summary.strip(), tools_used=tools_used)
+        return TurnResult(
+            answer=answer.strip(),
+            memory_summary=memory_summary.strip(),
+            tools_used=tools_used,
+            notifications=[],
+        )
 
     def respond(self, user_message: str) -> TurnResult:
         graph = self._build_graph()
         result = graph.invoke({"messages": [{"role": "user", "content": user_message}]})
         turn = self._extract_turn_result(result, user_message)
+        notifications = [format_due_reminder(reminder) for reminder in self.reminders.drain_due()]
+        turn.notifications = notifications
         self.memory.append(turn.memory_summary, turn.tools_used)
         self.session_memory.add(user_message)
         return turn

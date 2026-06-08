@@ -5,12 +5,15 @@ import os
 import re
 import shlex
 import subprocess
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
 import requests
 from ddgs import DDGS
 from langchain_core.tools import StructuredTool
+
+from .reminders import ReminderStore, default_reminders_path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_WORKSPACE_ROOT = Path(
@@ -20,6 +23,7 @@ DEFAULT_WORKSPACE_ROOT = Path(
 MAX_TEXT_CHARS = 20_000
 MAX_HTTP_BODY_CHARS = 8_000
 MAX_LIST_ITEMS = 80
+MAX_REMINDER_TITLE_CHARS = 200
 
 UNSAFE_SHELL_PATTERN = re.compile(r"[|;&<>`]")
 ALLOWED_SHELL_COMMANDS = {
@@ -64,6 +68,8 @@ WEATHER_CODE_MAP = {
     99: "сильная гроза с градом",
 }
 
+FX_CODE_PATTERN = re.compile(r"^[A-Z]{3}$")
+
 
 def workspace_root(workspace_root: str | Path | None = None) -> Path:
     root = Path(workspace_root or os.getenv("WORKSPACE_ROOT") or DEFAULT_WORKSPACE_ROOT)
@@ -94,6 +100,28 @@ def _json_or_empty(value: str) -> Any:
     if not value:
         return None
     return json.loads(value)
+
+
+def _normalize_currency_code(value: str) -> str:
+    code = str(value or "").strip().upper()
+    if not FX_CODE_PATTERN.match(code):
+        raise ValueError(f"Некорректный код валюты: {value}")
+    return code
+
+
+def _parse_quote_codes(value: str | Iterable[str]) -> list[str]:
+    if isinstance(value, str):
+        raw_codes = re.split(r"[,\s]+", value)
+    else:
+        raw_codes = list(value)
+    codes = [_normalize_currency_code(code) for code in raw_codes if str(code).strip()]
+    if not codes:
+        raise ValueError("Нужно указать хотя бы одну валюту для запроса")
+    deduplicated: list[str] = []
+    for code in codes:
+        if code not in deduplicated:
+            deduplicated.append(code)
+    return deduplicated
 
 
 def web_search(query: str, max_results: int = 5) -> str:
@@ -295,6 +323,79 @@ def get_crypto_price(coin: str, currency: str) -> float:
         raise ValueError(f"Не удалось получить цену для {coin}/{currency}") from exc
 
 
+def get_currency_rates(base_currency: str, quote_currencies: str = "USD,EUR,RUB") -> str:
+    base = _normalize_currency_code(base_currency)
+    quotes = [quote for quote in _parse_quote_codes(quote_currencies) if quote != base]
+    if not quotes:
+        default_quotes = ["USD", "EUR", "RUB"]
+        quotes = [quote for quote in default_quotes if quote != base]
+    if not quotes:
+        raise ValueError("Для запроса курсов не осталось доступных валют")
+    response = requests.get(
+        "https://api.frankfurter.dev/v2/rates",
+        params={"base": base, "quotes": ",".join(quotes)},
+        timeout=20,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if not isinstance(payload, list):
+        raise ValueError("Некорректный ответ валютного API")
+
+    rates: dict[str, float] = {}
+    date = ""
+    response_base = base
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
+        date = date or str(item.get("date") or "")
+        response_base = str(item.get("base") or response_base).upper()
+        quote = str(item.get("quote") or "").upper()
+        rate = item.get("rate")
+        if not quote:
+            continue
+        try:
+            rates[quote] = float(rate)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Некорректный курс для {quote}") from exc
+
+    return json.dumps(
+        {
+            "base": response_base,
+            "date": date,
+            "rates": rates,
+        },
+        ensure_ascii=False,
+    )
+
+
+def create_reminder(
+    title: str,
+    run_at_iso: str,
+    repeat_every_minutes: int = 0,
+    notes: str = "",
+) -> str:
+    store = ReminderStore.from_path(default_reminders_path())
+    reminder = store.create(
+        title=title,
+        run_at_iso=run_at_iso,
+        repeat_every_minutes=repeat_every_minutes,
+        notes=notes,
+    )
+    return json.dumps(reminder, ensure_ascii=False)
+
+
+def list_reminders(status: str = "active") -> str:
+    store = ReminderStore.from_path(default_reminders_path())
+    reminders = store.list(status=status)
+    return json.dumps({"entries": reminders}, ensure_ascii=False)
+
+
+def cancel_reminder(reminder_id: str) -> str:
+    store = ReminderStore.from_path(default_reminders_path())
+    reminder = store.cancel(reminder_id)
+    return json.dumps(reminder, ensure_ascii=False)
+
+
 def build_tools(workspace_root_path: str | Path | None = None) -> list[StructuredTool]:
     root = workspace_root(workspace_root_path)
 
@@ -338,5 +439,25 @@ def build_tools(workspace_root_path: str | Path | None = None) -> list[Structure
             func=lambda coin, currency: str(get_crypto_price(coin, currency)),
             name="get_crypto_price",
             description="Получить цену криптовалюты через CoinGecko. Возвращает число в строковом виде.",
+        ),
+        StructuredTool.from_function(
+            func=get_currency_rates,
+            name="get_currency_rates",
+            description="Получить актуальные курсы обычных валют через Frankfurter. Поддерживает base и список quotes через запятую.",
+        ),
+        StructuredTool.from_function(
+            func=create_reminder,
+            name="create_reminder",
+            description="Создать напоминание. Передавай title, run_at_iso и при необходимости repeat_every_minutes и notes.",
+        ),
+        StructuredTool.from_function(
+            func=list_reminders,
+            name="list_reminders",
+            description="Показать список напоминаний из JSON-хранилища.",
+        ),
+        StructuredTool.from_function(
+            func=cancel_reminder,
+            name="cancel_reminder",
+            description="Отменить напоминание по id.",
         ),
     ]

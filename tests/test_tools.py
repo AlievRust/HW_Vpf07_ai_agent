@@ -36,6 +36,25 @@ def test_crypto_price_parses_value(monkeypatch: pytest.MonkeyPatch) -> None:
     assert tools.get_crypto_price("bitcoin", "usd") == pytest.approx(12345.67)
 
 
+def test_currency_rates_parses_multiple_quotes(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_get(url: str, params: dict, timeout: int) -> FakeResponse:
+        assert "frankfurter" in url
+        assert params == {"base": "USD", "quotes": "EUR,RUB"}
+        return FakeResponse(
+            [
+                {"date": "2026-06-09", "base": "USD", "quote": "EUR", "rate": 0.91},
+                {"date": "2026-06-09", "base": "USD", "quote": "RUB", "rate": 91.5},
+            ]
+        )
+
+    monkeypatch.setattr(tools.requests, "get", fake_get)
+
+    payload = json.loads(tools.get_currency_rates("USD"))
+    assert payload["base"] == "USD"
+    assert payload["rates"]["EUR"] == pytest.approx(0.91)
+    assert payload["rates"]["RUB"] == pytest.approx(91.5)
+
+
 def test_weather_queries_geocode_and_forecast(monkeypatch: pytest.MonkeyPatch) -> None:
     responses = [
         FakeResponse(
